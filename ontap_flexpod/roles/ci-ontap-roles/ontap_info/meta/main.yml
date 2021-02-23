@@ -1,0 +1,3 @@
+#NetApp Collections for ontap_info module
+collections:
+  - netapp.ontap

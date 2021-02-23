@@ -1,0 +1,146 @@
+# Ensure Telnet is turned off for a given user
+- name: Disable Telnet
+  na_ontap_user:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    name: "{{item.user_or_group_name}}"
+    role_name: "{{item.role_name}}"
+    authentication_method: "{{item.authentication_method}}"
+    vserver: "{{item.vserver}}"
+    application: telnet
+    https: true
+    validate_certs: false
+    state: absent
+  with_items:
+    - "{{disable_telnet_vars}}"
+  tags:
+    - disable_telnet
+
+# Enable auto giveback on HA systems
+- name: Enable HA Auto-giveback
+  na_ontap_command:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    https: true
+    validate_certs: false
+    command: "['storage', 'failover', 'modify', '-node', '{{item}}', '-auto-giveback', 'true', '-auto-giveback-after-panic', 'true']"
+  with_items:
+    - "{{nodes}}"
+  tags:
+    - enable_auto_giveback
+
+- name: Modify firewall policy to Enable HTTPS
+  na_ontap_firewall_policy:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    vserver: "{{item.vserver}}"
+    state: present
+    service: https
+    policy: "{{item.policy}}"
+    allow_list: 0.0.0.0/0
+  with_items:
+    - "{{enable_https_vars}}"
+  tags:
+    - enable_https
+
+# Ensure SSH is turned on for a given user
+- name: Enable SSH
+  na_ontap_user:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    name: "{{item.user_or_group_name}}"
+    role_name: "{{item.role_name}}"
+    authentication_method: "{{item.authentication_method}}"
+    vserver: "{{item.vserver}}"
+    application: ssh
+    https: true
+    validate_certs: false
+    state: present
+  with_items:
+    - "{{enable_ssh_vars}}"
+  tags:
+    - enable_ssh
+
+- name: Modify firewall policy to Enable SSH
+  na_ontap_firewall_policy:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    vserver: "{{item.vserver}}"
+    state: present
+    service: ssh
+    policy: "{{item.policy}}"
+    allow_list: 0.0.0.0/0
+    https: true
+    validate_certs: false
+  with_items:
+    - "{{enable_ssh_vars}}"
+  tags:
+    - enable_ssh
+
+# Configure DNS
+- name: Configure DNS
+  na_ontap_dns:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    state: present
+    vserver: "{{item}}"
+    nameservers: "{{dns_vars.nameservers}}"
+    domains: "{{dns_vars.domains}}"
+    https: true
+    validate_certs: false
+  with_items:
+    - "{{vservers}}"
+  tags:
+    - configure_dns
+
+# Modify node name
+- name: Modify node name
+  na_ontap_node:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    name: "{{rename_node_vars.new_name}}"
+    from_name: "{{rename_node_vars.old_name}}"
+    https: true
+    validate_certs: false
+  tags:
+    - modify_nodename
+
+- name: Enable CDP on FAS Controller
+  na_ontap_command:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    command: "['options', '-option-name', 'cdpd.enable', '-vserver', '{{item}}', '-option-value', 'on']"
+    https: true
+    validate_certs: false
+  with_items:
+    - "{{nodes}}"
+  tags:
+    - enable_cdp
+
+# Get the Ontap Info
+- name: Get ONTAP info
+  na_ontap_info:
+    hostname: "{{inventory_hostname}}"
+    username: "{{username}}"
+    password: "{{password}}"
+    state: info
+    https: true
+    validate_certs: false
+  register: ontap_info
+  tags:
+    - ontap_info
+
+- name: Copy ONTAP info
+  copy:
+      content: "{{ ontap_info | to_nice_json }}"
+      dest: "ontap_info.json"
+  tags:
+    - ontap_info

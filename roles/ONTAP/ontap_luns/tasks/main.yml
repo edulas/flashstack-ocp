@@ -1,0 +1,248 @@
+# Create the boot LUNs for Servers
+- name: Create the boot LUNs for Servers
+  na_ontap_lun: 
+    hostname: "{{ inventory_hostname }}" 
+    username: "{{ username }}" 
+    password: "{{ password }}" 
+    state: present 
+    vserver: "{{ infrastructure_svm }}" 
+    name: "{{ item }}" 
+    size: "{{ boot_lun_size }}" 
+    flexvol_name: "{{ boot_volume[0].name }}" 
+    ostype: "{{ infra_OS }}" 
+    space_reserve: false 
+    https: true 
+    validate_certs: false
+  with_sequence:
+    start="{{ first_boot_lun }}" end="{{ ucs_blades.msg }}" format="{{ boot_lun_prefix }}"
+  tags:
+    - ontap_lun_create
+
+#Create igroups for iSCSI
+- name: Create the igroups for iSCSI
+  na_ontap_igroup: 
+    hostname: "{{ inventory_hostname }}" 
+    username: "{{ username }}" 
+    password: "{{ password }}" 
+    state: present 
+    vserver: "{{ infrastructure_svm }}" 
+    initiator: "{{ item.0 }}" 
+    ostype: vmware  
+    initiator_group_type: iscsi 
+    name: "{{ item.1 }}-iSCSI" 
+    https: true 
+    validate_certs: false
+  with_together:
+    - "{{ ucs_iqn.ansible_facts.myvar }}"
+    - "{{ ucs_sp_names.ansible_facts.myvar }}"
+  when: "('iscsi' in allowed_protocols)"   
+  tags:
+    - ontap_iscsi_igroup_create
+
+# Create igroups for FCP
+# For FCP, we need to add multiple WWPN from the single host to an igroup
+- name: Create the igroups for FCP
+  na_ontap_igroup:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    state: present
+    vserver: "{{ infrastructure_svm }}"
+    initiators: "{{ item.0.pwwn }},{{ item.1 }}"
+    ostype: vmware
+    initiator_group_type: fcp
+    name: "{{item.0.name }}-FCP"
+    https: true
+    validate_certs: false
+  with_together:
+    - "{{ ucs_wwpn_a }}"
+    - "{{ ucs_wwpn_b.ansible_facts.myvar }}"
+  when: "('fcp' in allowed_protocols)"
+  tags:
+    - ontap_fcp_igroup_create
+
+#ONTAP Info for ESXi Boot LUNs
+- name: ONTAP Info
+  na_ontap_info:
+    state: info
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    http_port: null
+    https: true
+    validate_certs: false
+    gather_subset: "lun_info"
+  register: boot_luns
+  tags:
+    - ontap_boot_lun_info
+
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ boot_luns | to_nice_json }}'                                                                                                                                                                                                                                
+    dest: vars/generated/boot_luns                                                                                                                                                                                                                                           
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- shell: cat vars/generated/boot_luns                                                                                                                                                                                                                                        
+  register: result                                                                                                                                                                                                                                                           
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- set_fact:                                                                                                                                                                                                                                                                  
+    bootvar1: "{{ result.stdout | from_json | json_query('ontap_info.lun_info.*.[{lun_path: path, vserver: vserver}]') }}"                                                                                                                                                   
+  register: lun_path_vservers                                                                                                                                                                                                                                                
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ lun_path_vservers | to_nice_json }}'                                                                                                                                                                                                                        
+    dest: vars/generated/lun_path_vservers                                                                                                                                                                                                                                   
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- shell: cat vars/generated/lun_path_vservers                                                                                                                                                                                                                                
+  register: luns_vservers                                                                                                                                                                                                                                                    
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- set_fact:                                                                                                                                                                                                                                                                  
+    bootvar2: "{{ luns_vservers.stdout | from_json | json_query(bootquery) }}"                                                                                                                                                                                               
+  vars:                                                                                                                                                                                                                                                                      
+    bootquery: 'ansible_facts.bootvar1[*][?vserver==`{{ infrastructure_svm }}`][]'                                                                                                                                                                                           
+  register: lun_path_vserver                                                                                                                                                                                                                                                 
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ lun_path_vserver | to_nice_json }}'                                                                                                                                                                                                                         
+    dest: vars/generated/lun_path_vserver                                                                                                                                                                                                                                    
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- shell: cat vars/generated/lun_path_vserver                                                                                                                                                                                                                                 
+  register: boot_luns                                                                                                                                                                                                                                                        
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- set_fact:                                                                                                                                                                                                                                                                  
+    bootvar: "{{ boot_luns.stdout | from_json | json_query('ansible_facts.bootvar2[*].lun_path') }}"                                                                                                                                                                         
+  register: lun_path                                                                                                                                                                                                                                                         
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                             
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ lun_path | to_nice_json }}'                                                                                                                                                                                                                                 
+    dest: vars/generated/ontap_lun_path                                                                                                                                                                                                                                      
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_boot_lun_info
+
+#ONTAP Info for iGroups
+- name: ONTAP Info
+  na_ontap_info:
+    state: info
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    http_port: null
+    https: true
+    validate_certs: false
+    gather_subset: "igroup_info"
+  register: igroups
+  tags:
+    - ontap_igroup_info
+
+- copy:
+    content: '{{ igroups | to_nice_json }}'
+    dest: vars/generated/temp_igroups
+  tags:
+    - ontap_igroup_info
+
+- shell: cat vars/generated/temp_igroups
+  register: result
+  tags:
+    - ontap_igroup_info
+
+- set_fact:
+    bootvar1: "{{ result.stdout | from_json | json_query('ontap_info.igroup_info.*.[{igroup_name: initiator_group_name, vserver: vserver}]') }}"
+  register: ontap_igroups_vservers
+  tags:
+    - ontap_igroup_info
+
+- copy:
+    content: '{{ ontap_igroups_vservers | to_nice_json }}'
+    dest: vars/generated/ontap_igroups_vservers
+  tags:
+    - ontap_igroup_info
+
+- shell: cat vars/generated/ontap_igroups_vservers                                                                                                                                                                                                                            
+  register: igroups_vservers                                                                                                                                                                                                                                                 
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                             
+- set_fact:                                                                                                                                                                                                                                                                  
+    bootvar2: "{{ igroups_vservers.stdout | from_json | json_query(myquery) }}"                                                                                                                                                                                              
+  vars:                                                                                                                                                                                                                                                                      
+    myquery: 'ansible_facts.bootvar1[*][?vserver==`{{ infrastructure_svm }}`][]'                                                                                                                                                                                             
+  register: ontap_igroups_vserver                                                                                                                                                                                                                                            
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                             
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ ontap_igroups_vserver | to_nice_json }}'                                                                                                                                                                                                                    
+    dest: vars/generated/ontap_igroups_vserver                                                                                                                                                                                                                               
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                             
+- shell: cat vars/generated/ontap_igroups_vserver                                                                                                                                                                                                                            
+  register: final_igroups_vserver                                                                                                                                                                                                                                            
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                             
+- set_fact:                                                                                                                                                                                                                                                                  
+    bootvar: "{{ final_igroups_vserver.stdout | from_json | json_query('ansible_facts.bootvar2[*].igroup_name') }}"                                                                                                                                                          
+  register: ontap_igroups                                                                                                                                                                                                                                                    
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                             
+- copy:                                                                                                                                                                                                                                                                      
+    content: '{{ ontap_igroups | to_nice_json }}'                                                                                                                                                                                                                            
+    dest: vars/generated/ontap_igroups                                                                                                                                                                                                                                       
+  tags:                                                                                                                                                                                                                                                                      
+    - ontap_igroup_info
+
+# Map the LUNs to iSCSI igroups
+- name: Mapping LUN to iSCSI igroup
+  na_ontap_lun_map:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    state: present
+    vserver: "{{ infrastructure_svm }}"
+    initiator_group_name: "{{ item.0 }}"
+    path: "{{ item.1 }}"
+    https: true
+    validate_certs: false
+  with_together:
+    - "{{ ontap_igroups.ansible_facts.bootvar }}"
+    - "{{ ontap_lun_path.ansible_facts.bootvar }}"
+  when: "('iscsi' in allowed_protocols)"   
+  tags:
+    - ontap_map_lun_to_igroup
+
+# Map the LUNs to FCP igroups
+- name: Mapping LUN to FCP igroup
+  na_ontap_lun_map:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    state: present
+    vserver: "{{ infrastructure_svm }}"
+    initiator_group_name: "{{ item.0 }}"
+    path: "{{ item.1 }}"
+    https: true
+    validate_certs: false
+  with_together:
+    - "{{ ontap_igroups.ansible_facts.bootvar }}"
+    - "{{ ontap_lun_path.ansible_facts.bootvar }}"
+  when: "('fcp' in allowed_protocols)"
+  tags:
+    - ontap_map_lun_to_igroup

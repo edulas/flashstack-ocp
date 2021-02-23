@@ -10,6 +10,14 @@ configure_nfs: "yes"
 ntp_servers:
   - ip_address: "192.168.156.21"
   - ip_address: "192.168.156.22"
+#
+# Uncomment and update the the following lines to setup DNS Server(s)
+dns_servers:
+  - ip_address: "10.1.156.250"
+  - ip_address: "10.1.156.251"
+
+# Uncomment and update the the following line to setup Timezone
+time_zone: 'America/New_York'
 
 # VLAN Names are adjustable and can be modified in here
 #
@@ -32,39 +40,56 @@ vlan_list:
     id: '2'
     native: 'yes'
     state: "{{lan_state}}"
+    to_storage: 'no'
+    storage_protocol: 'none'
   - name: "{{ oob_vlan_name }}"
     id: '13'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'no'
+    storage_protocol: 'none'
   - name: "{{ baremetal_vlan_name }}"
     id: '113'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'yes'
+    storage_protocol: 'none'
   - name: "{{ provisioning_vlan_name }}"
     id: '904'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'no'
+    storage_protocol: 'none'
   - name: "{{ vm_traffic_vlan_name }}"
     id: '914'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'no'
+    storage_protocol: 'none'
   - name: "{{ system_nfs_vlan_name }}"
     id: '3054'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'yes'
+    storage_protocol: 'NFS'
   - name: "{{ persistent_nfs_vlan_name }}"
     id: '3154'
     native: 'no'
+    to_storage: 'yes'
+    storage_protocol: 'NFS'
     state: "{{lan_state}}"
-    # ISCSI A and B VLANs should be deleted for Fiber-Channel-Only deployments
   - name: "{{ iscsiA_vlan_name }}"
     id: '3014'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'yes'
+    storage_protocol: 'iSCSI'
   - name: "{{ iscsiB_vlan_name }}"
     id: '3024'
     native: 'no'
     state: "{{lan_state}}"
+    to_storage: 'yes'
+    storage_protocol: 'iSCSI'
 #
 # VLANs definition below will be used to setup trunk ports on Nexus Switches
 # all_vlans_list: for vpc_peer_link and UCS FI trunk ports

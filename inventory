@@ -5,3 +5,6 @@
 n9kA ansible_host=192.168.156.21 ansible_user=admin ansible_password=H1ghV0lt ansible_network_os=nxos
 n9kB ansible_host=192.168.156.22 ansible_user=admin ansible_password=H1ghV0lt ansible_network_os=nxos
 
+[ontap]
+#ONTAP Cluster Management IP. List only one ONTAP cluster IP.
+xxx.xxx.xxx.xxx

@@ -58,8 +58,8 @@
                           "properties": {},
                       "children": [
                           {
-                              "module": "ucsmsdk.mometa.lsboot.LsbootLocalHddImage",
-                              "class": "LsbootLocalHddImage",
+                              "module": "ucsmsdk.mometa.lsboot.LsbootEmbeddedLocalLunImage",
+                              "class": "LsbootEmbeddedLocalLunImage",
                               "properties": {
                                   "order": "2"
                               },
