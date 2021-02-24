@@ -23,7 +23,7 @@
       ipmi_access_profile: "{{ ipmi_pol_name }}"
       power_state: down
   #
-  - name: Configure Service Profile Template for OCP Master Nodes
+  - name: Configure Service Profile Template for OCP Worker Nodes
     ucs_service_profile_template:
       hostname: "{{ inventory_hostname }}"
       username: "{{ username }}"
